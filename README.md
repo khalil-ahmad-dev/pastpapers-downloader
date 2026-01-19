@@ -96,7 +96,6 @@ PastPapersDownloader/
 │   └── index.py           # Vercel serverless function entry point
 ├── temp_downloads/        # Temporary download storage (local)
 ├── requirements.txt       # Python dependencies
-├── vercel.json            # Vercel deployment configuration
 └── README.md              # This file
 ```
 
@@ -109,60 +108,6 @@ Optional environment variables (defaults are provided):
 - `PORT`: Server port (default: `8000`)
 - `MAX_CONCURRENT_DOWNLOADS`: Max concurrent downloads (default: `15`)
 - `DOWNLOAD_TIMEOUT`: Download timeout in seconds (default: `30`)
-
-## Deployment
-
-### Vercel Deployment
-
-The application is configured for Vercel serverless deployment:
-
-1. **Push to GitHub**
-   ```bash
-   git add .
-   git commit -m "Deploy to Vercel"
-   git push
-   ```
-
-2. **Connect to Vercel**
-   - Go to [Vercel Dashboard](https://vercel.com)
-   - Import your GitHub repository
-   - Root directory: `/` (default)
-   - Vercel will auto-detect the configuration
-
-3. **Add Upstash Redis (REQUIRED for job persistence)**
-   - Go to your project in Vercel Dashboard
-   - Click on **"Storage"** tab (or **"Integrations"**)
-   - Click **"Browse Marketplace"** or **"Add Integration"**
-   - Search for **"Upstash Redis"**
-   - Click **"Add"** or **"Install"**
-   - Follow prompts to create a new Redis database
-   - Vercel will automatically set environment variables:
-     - `UPSTASH_REDIS_REST_URL`
-     - `UPSTASH_REDIS_REST_TOKEN`
-   - **No code changes needed** - the app will automatically use Redis!
-
-4. **Redeploy**
-   - Go to **"Deployments"** tab
-   - Click **"Redeploy"** on latest deployment
-   - Or push a new commit to trigger auto-deploy
-
-5. **Verify**
-   - Check Vercel logs for "Redis connection established"
-   - Test a download - jobs should persist across requests!
-
-**Note**: Vercel has serverless limitations:
-- Function timeout: 10s (Hobby) or 60s (Pro)
-- `/tmp` storage is temporary and isolated per function
-- **Upstash Redis is required** for job persistence across requests
-- Free tier: 10,000 commands/day (usually sufficient)
-
-### Other Platforms
-
-The application can also be deployed to:
-- **Railway**: Full server control, no timeouts
-- **Render**: Similar to Railway
-- **DigitalOcean**: VPS deployment
-- **Heroku**: Traditional hosting
 
 ## Caching
 
@@ -205,7 +150,7 @@ uvicorn app.main:app --port 8001
 **Download fails**
 - Check internet connection
 - Verify PapaCambridge website is accessible
-- Check Vercel logs if deployed (timeout issues)
+- Check server logs for errors
 
 ## Development
 
@@ -226,6 +171,10 @@ pytest
 - **Models**: Data validation with Pydantic
 - **Templates**: Frontend HTML/CSS/JS
 
+## Deployment
+
+For deployment instructions, see [docs/VERCEL_DEPLOYMENT.md](docs/VERCEL_DEPLOYMENT.md).
+
 ## License
 
 This project is for educational purposes. Please respect PapaCambridge's terms of service when using this tool.
@@ -238,9 +187,8 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 For issues or questions:
 1. Check the troubleshooting section
-2. Review Vercel deployment logs (if deployed)
+2. Review server logs for backend errors
 3. Check browser console for frontend errors
-4. Review server logs for backend errors
 
 ---
 

@@ -214,7 +214,7 @@ async def download_bulk_files(
     
     job["status"] = "downloading"
     job["message"] = f"Downloading {total_files} files..."
-    _save_job_to_file(job_id, job)
+    save_job_to_file(job_id, job)
     
     # Download files with concurrency limit
     semaphore = asyncio.Semaphore(settings.MAX_CONCURRENT_DOWNLOADS)
@@ -270,7 +270,7 @@ async def download_bulk_files(
     job["status"] = "creating_zip"
     job["message"] = "Creating ZIP archive..."
     job["percentage"] = 95
-    _save_job_to_file(job_id, job)
+    save_job_to_file(job_id, job)
     
     zip_path = create_zip_archive(job_id, subjects, qualification)
     
@@ -282,7 +282,7 @@ async def download_bulk_files(
     job["message"] = f"Download complete! {downloaded_count} files downloaded, {failed_count} failed."
     
     # Save final job state
-    _save_job_to_file(job_id, job)
+    save_job_to_file(job_id, job)
     
     return job
 
@@ -359,6 +359,7 @@ def create_download_job(
     
     # Store in Redis if available (for Vercel/serverless)
     # CRITICAL: Always try Redis first if enabled, then fallback
+    redis_saved = False
     if _redis_enabled and _redis_client:
         try:
             _redis_client.set(
@@ -370,10 +371,11 @@ def create_download_job(
             verify = _redis_client.get(f"job:{job_id}")
             if verify is None:
                 raise Exception("Redis write verification failed")
+            redis_saved = True
         except Exception as e:
             import logging
             logging.error(f"Failed to save job to Redis: {e}, falling back to file storage")
-            # Fall through to file storage
+            redis_saved = False
     
     # Also store in file system (fallback for local dev or if Redis unavailable/failed)
     # On Vercel, if Redis is enabled and working, we skip file storage
@@ -615,7 +617,7 @@ async def download_direct_files(
     job["message"] = f"Ready to download {total_files} files. Click 'Start Download' to begin."
     job["direct_download_urls"] = all_files
     
-    _save_job_to_file(job_id, job)
+    save_job_to_file(job_id, job)
     
     return job
 
