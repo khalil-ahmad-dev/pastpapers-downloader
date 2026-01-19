@@ -103,7 +103,7 @@ async def download_bulk_files(
     job["total_files"] = 0
     
     # Save to file system (for serverless)
-    _save_job_to_file(job_id, job)
+    save_job_to_file(job_id, job)
     
     # Parse seasons into structured format
     season_map = {}  # {subjectCode: [seasonIds]}
@@ -161,7 +161,7 @@ async def download_bulk_files(
     if total_files == 0:
         job["status"] = "failed"
         job["message"] = "No files found to download."
-        _save_job_to_file(job_id, job)
+        save_job_to_file(job_id, job)
         return job
     
     job["status"] = "downloading"
@@ -216,7 +216,7 @@ async def download_bulk_files(
             
             # Save job to file system periodically (every 10 files or on status change)
             if downloaded_count % 10 == 0 or downloaded_count == total_files:
-                _save_job_to_file(job_id, job)
+                save_job_to_file(job_id, job)
     
     # Create ZIP archive
     job["status"] = "creating_zip"
@@ -310,15 +310,61 @@ def create_download_job(
     download_jobs[job_id] = job_data
     
     # Also store in file system (for Vercel/serverless)
+    # CRITICAL: Must save to file immediately for serverless
     try:
+        # Ensure directory exists
+        JOB_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+        
         job_file = JOB_STORAGE_DIR / f"{job_id}.json"
         with open(job_file, 'w') as f:
             json.dump(job_data, f)
+            f.flush()  # Flush before closing
+            # Sync to disk (important for serverless)
+            import os
+            if hasattr(f, 'fileno'):
+                try:
+                    os.fsync(f.fileno())
+                except OSError:
+                    pass  # Some file systems don't support fsync
     except (PermissionError, OSError) as e:
         # If file storage fails, continue with memory only
+        # But log the error for debugging
+        import logging
+        logging.warning(f"Failed to save job to file: {e}")
         pass
     
     return job_id
+
+
+def save_job_to_file(job_id: str, job_data: Dict):
+    """
+    Save job data to file system (for serverless compatibility).
+    CRITICAL: Must ensure file is written and flushed for Vercel.
+    
+    Args:
+        job_id: Job ID
+        job_data: Job data dictionary
+    """
+    try:
+        # Ensure directory exists
+        JOB_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+        
+        job_file = JOB_STORAGE_DIR / f"{job_id}.json"
+        with open(job_file, 'w') as f:
+            json.dump(job_data, f)
+            f.flush()  # Flush before closing
+            # Sync to disk (critical for serverless)
+            import os
+            if hasattr(f, 'fileno'):
+                try:
+                    os.fsync(f.fileno())
+                except OSError:
+                    pass  # Some file systems don't support fsync
+    except (PermissionError, OSError) as e:
+        # If file storage fails, continue with memory only
+        import logging
+        logging.warning(f"Failed to save job {job_id} to file: {e}")
+        pass
 
 
 def get_job_status(job_id: str) -> Optional[Dict]:

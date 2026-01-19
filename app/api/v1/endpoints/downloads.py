@@ -49,10 +49,20 @@ async def start_bulk_download(
             download_method="zip"  # Always ZIP
         )
         
-        # Set initial status
+        # CRITICAL: Verify job was created and saved to file
+        # In serverless, we need to ensure file is written before returning
         job = download_service.get_job_status(job_id)
+        if not job:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to create job. This might be a serverless storage issue.",
+            )
+        
+        # Set initial status and save immediately
         job["status"] = "initializing"
         job["message"] = "Starting download... Please wait."
+        # Save job to file immediately (critical for serverless)
+        download_service.save_job_to_file(job_id, job)
         
         # Start download in background (this does all the heavy work)
         background_tasks.add_task(
