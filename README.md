@@ -129,14 +129,32 @@ The application is configured for Vercel serverless deployment:
    - Root directory: `/` (default)
    - Vercel will auto-detect the configuration
 
-3. **Deploy**
-   - Vercel will automatically deploy on every push
-   - Check deployment logs for any issues
+3. **Add Upstash Redis (REQUIRED for job persistence)**
+   - Go to your project in Vercel Dashboard
+   - Click on **"Storage"** tab (or **"Integrations"**)
+   - Click **"Browse Marketplace"** or **"Add Integration"**
+   - Search for **"Upstash Redis"**
+   - Click **"Add"** or **"Install"**
+   - Follow prompts to create a new Redis database
+   - Vercel will automatically set environment variables:
+     - `UPSTASH_REDIS_REST_URL`
+     - `UPSTASH_REDIS_REST_TOKEN`
+   - **No code changes needed** - the app will automatically use Redis!
+
+4. **Redeploy**
+   - Go to **"Deployments"** tab
+   - Click **"Redeploy"** on latest deployment
+   - Or push a new commit to trigger auto-deploy
+
+5. **Verify**
+   - Check Vercel logs for "Redis connection established"
+   - Test a download - jobs should persist across requests!
 
 **Note**: Vercel has serverless limitations:
 - Function timeout: 10s (Hobby) or 60s (Pro)
-- `/tmp` storage is temporary
-- Consider external storage for production use
+- `/tmp` storage is temporary and isolated per function
+- **Upstash Redis is required** for job persistence across requests
+- Free tier: 10,000 commands/day (usually sufficient)
 
 ### Other Platforms
 
