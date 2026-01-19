@@ -1,150 +1,229 @@
-# 📚 PastPapersDownloader - Web Application
+# Past Papers Downloader
 
-A modern FastAPI web application for downloading CAIE past papers from PapaCambridge. Browse qualifications, select subjects and seasons, and download bulk past papers with real-time progress tracking.
+A web application for downloading CAIE (Cambridge Assessment International Education) past papers from PapaCambridge. Built with FastAPI, featuring a clean web UI for selecting qualifications, subjects, seasons, and bulk downloading papers as organized ZIP files.
 
----
+## Features
 
-## ✨ Features
+- 🎓 **Multiple Qualifications**: Support for AICE (AS and A Level), IGCSE, and O Level
+- 📚 **Subject Selection**: Browse and search through available subjects
+- 📅 **Season Selection**: Select multiple years/seasons for bulk downloads
+- 📦 **Bulk Downloads**: Download multiple seasons as organized ZIP files
+- ⚡ **Fast Performance**: Caching system for faster page loads
+- 📊 **Progress Tracking**: Real-time progress updates during downloads
+- 🎨 **Clean UI**: Simple, user-friendly interface
 
-- **Web UI**: Beautiful, intuitive interface for browsing and selecting past papers
-- **Multiple Qualifications**: Support for A-Level, IGCSE, and O-Level
-- **Bulk Downloads**: Download multiple subjects and seasons at once
-- **Progress Tracking**: Real-time progress updates during downloads
-- **Organized ZIP Files**: Downloads come in organized folder structures
-- **User-Friendly**: Select download location via browser save dialog
+## Tech Stack
 
----
+- **Backend**: FastAPI (Python)
+- **Frontend**: HTML, CSS, JavaScript
+- **Web Scraping**: BeautifulSoup4, Requests
+- **Async Downloads**: aiohttp
+- **Templating**: Jinja2
 
-## 🚀 Quick Start
+## Installation
 
-### Installation
+### Prerequisites
 
-1. **Clone the repository:**
+- Python 3.8 or higher
+- pip (Python package manager)
+
+### Setup
+
+1. **Clone the repository**
    ```bash
-   git clone <repository-url>
+   git clone <your-repo-url>
    cd PastPapersDownloader
    ```
 
-2. **Install dependencies:**
+2. **Create a virtual environment (recommended)**
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+
+3. **Install dependencies**
    ```bash
    pip install -r requirements.txt
    ```
 
-3. **Start the server:**
+## Running the Application
+
+### Local Development
+
+1. **Start the server**
    ```bash
-   python3 -m uvicorn app.main:app --reload
+   uvicorn app.main:app --reload
    ```
 
-4. **Open in browser:**
-   ```
-   http://localhost:8000
-   ```
+2. **Access the application**
+   - Open your browser and go to: `http://localhost:8000`
+   - The app will be available at the root URL
 
----
+3. **API Documentation**
+   - Swagger UI: `http://localhost:8000/api/docs`
+   - ReDoc: `http://localhost:8000/api/redoc`
 
-## 📖 Usage
-
-### Web Interface
-
-1. **Select Qualification**: Choose A-Level, IGCSE, or O-Level
-2. **Select Subjects**: Choose one or more subjects (multi-select)
-3. **Select Seasons**: Choose one or more years/seasons to download
-4. **Download**: Click "Download Selected" to start bulk download
-5. **Monitor Progress**: Watch real-time progress on the download page
-6. **Get ZIP**: Download the organized ZIP file when complete
-
-### API Endpoints
-
-The application provides a REST API for programmatic access:
-
-- **GET** `/api/v1/qualifications/` - List all qualifications
-- **GET** `/api/v1/subjects/?qualification=AICE` - List subjects
-- **GET** `/api/v1/subjects/{code}/seasons?qualification=AICE` - List seasons
-- **POST** `/api/v1/downloads/bulk` - Start bulk download
-- **GET** `/api/v1/downloads/{job_id}/progress` - Get download progress
-- **GET** `/api/v1/downloads/{job_id}/zip` - Download ZIP file
-
-**API Documentation**: Visit `http://localhost:8000/api/docs` for interactive API documentation.
-
----
-
-## 🏗️ Architecture
-
-### Technology Stack
-
-- **Backend**: FastAPI (Python)
-- **Web Scraping**: BeautifulSoup4, requests
-- **Async Downloads**: aiohttp
-- **Frontend**: HTML, CSS, JavaScript (vanilla)
-- **Server**: Uvicorn (ASGI)
-
-### Project Structure
-
-```
-app/
-├── main.py              # FastAPI application entry point
-├── api/                 # API routes
-│   └── v1/
-│       └── endpoints/   # API endpoint modules
-├── core/                # Core modules (config, links, models)
-├── models/              # Pydantic data models
-├── services/            # Business logic services
-├── static/              # Static files (CSS, JS)
-└── templates/           # HTML templates
-```
-
----
-
-## ⚙️ Configuration
-
-Create a `.env` file (see `.env.example`) to configure:
-
-- `HOST` - Server host (default: 0.0.0.0)
-- `PORT` - Server port (default: 8000)
-- `MAX_CONCURRENT_DOWNLOADS` - Concurrent download limit (default: 15)
-- `DOWNLOAD_TIMEOUT` - Download timeout in seconds (default: 30)
-- `CLEANUP_TTL_HOURS` - Temp file cleanup time (default: 1)
-
----
-
-## 📝 Development
-
-### Running in Development
+### Production Mode
 
 ```bash
-# With auto-reload
-python3 -m uvicorn app.main:app --reload
-
-# Production mode
-python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-### Testing
+## Usage
 
-See `docs/TESTING.md` for testing guide.
+1. **Select Qualification**: Choose AICE, IGCSE, or O Level
+2. **Select Subjects**: Browse and select one or more subjects
+3. **Select Seasons**: Choose the years/seasons you want to download
+4. **Download**: Click "Download Selected" to start the download
+5. **Monitor Progress**: Watch real-time progress on the download page
+6. **Download ZIP**: Once complete, download the organized ZIP file
+
+## Project Structure
+
+```
+PastPapersDownloader/
+├── app/
+│   ├── api/              # API endpoints
+│   │   └── v1/
+│   │       └── endpoints/ # Qualification, Subject, Season, Download endpoints
+│   ├── core/              # Core configuration and models
+│   ├── models/            # Pydantic models
+│   ├── services/          # Business logic (scraping, downloads, caching)
+│   ├── static/            # Static files (CSS, JS, images)
+│   ├── templates/         # HTML templates
+│   └── main.py            # FastAPI application entry point
+├── api/
+│   └── index.py           # Vercel serverless function entry point
+├── temp_downloads/        # Temporary download storage (local)
+├── requirements.txt       # Python dependencies
+├── vercel.json            # Vercel deployment configuration
+└── README.md              # This file
+```
+
+## Environment Variables
+
+Optional environment variables (defaults are provided):
+
+- `DEBUG`: Set to `true` for debug mode (default: `false`)
+- `HOST`: Server host (default: `0.0.0.0`)
+- `PORT`: Server port (default: `8000`)
+- `MAX_CONCURRENT_DOWNLOADS`: Max concurrent downloads (default: `15`)
+- `DOWNLOAD_TIMEOUT`: Download timeout in seconds (default: `30`)
+
+## Deployment
+
+### Vercel Deployment
+
+The application is configured for Vercel serverless deployment:
+
+1. **Push to GitHub**
+   ```bash
+   git add .
+   git commit -m "Deploy to Vercel"
+   git push
+   ```
+
+2. **Connect to Vercel**
+   - Go to [Vercel Dashboard](https://vercel.com)
+   - Import your GitHub repository
+   - Root directory: `/` (default)
+   - Vercel will auto-detect the configuration
+
+3. **Deploy**
+   - Vercel will automatically deploy on every push
+   - Check deployment logs for any issues
+
+**Note**: Vercel has serverless limitations:
+- Function timeout: 10s (Hobby) or 60s (Pro)
+- `/tmp` storage is temporary
+- Consider external storage for production use
+
+### Other Platforms
+
+The application can also be deployed to:
+- **Railway**: Full server control, no timeouts
+- **Render**: Similar to Railway
+- **DigitalOcean**: VPS deployment
+- **Heroku**: Traditional hosting
+
+## Caching
+
+The application uses in-memory caching to improve performance:
+
+- **Qualifications**: Cached for 1 hour
+- **Subjects**: Cached for 1 hour
+- **Seasons**: Cached for 1 hour
+- **File Counts**: Cached for 24 hours
+
+This means:
+- First visit: Normal speed (scrapes data)
+- Return visits: Instant (from cache)
+
+## API Endpoints
+
+- `GET /api/v1/qualifications` - List all qualifications
+- `GET /api/v1/subjects?qualification={id}` - List subjects for a qualification
+- `GET /api/v1/subjects/{code}/seasons?qualification={id}` - List seasons for a subject
+- `POST /api/v1/downloads/bulk` - Start a bulk download
+- `GET /api/v1/downloads/{job_id}/progress` - Get download progress
+- `GET /api/v1/downloads/{job_id}/zip` - Download completed ZIP file
+
+## Troubleshooting
+
+### Common Issues
+
+**Port already in use**
+```bash
+# Use a different port
+uvicorn app.main:app --port 8001
+```
+
+**Import errors**
+```bash
+# Make sure you're in the project root directory
+# And virtual environment is activated
+```
+
+**Download fails**
+- Check internet connection
+- Verify PapaCambridge website is accessible
+- Check Vercel logs if deployed (timeout issues)
+
+## Development
+
+### Running Tests
+
+```bash
+# Install test dependencies
+pip install pytest
+
+# Run tests
+pytest
+```
+
+### Code Structure
+
+- **Services**: Business logic and web scraping
+- **API Endpoints**: REST API routes
+- **Models**: Data validation with Pydantic
+- **Templates**: Frontend HTML/CSS/JS
+
+## License
+
+This project is for educational purposes. Please respect PapaCambridge's terms of service when using this tool.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## Support
+
+For issues or questions:
+1. Check the troubleshooting section
+2. Review Vercel deployment logs (if deployed)
+3. Check browser console for frontend errors
+4. Review server logs for backend errors
 
 ---
 
-## 📄 License
-
-See `LICENSE` file for details.
-
----
-
-## 🤝 Contributing
-
-This is a migrated FastAPI application. For development notes and architecture details, see the `docs/` directory.
-
----
-
-## 📚 Documentation
-
-- **API Documentation**: http://localhost:8000/api/docs (when server is running)
-- **Testing Guide**: `docs/TESTING.md`
-- **Architecture**: `docs/ARCHITECTURE_DIAGRAM.md`
-- **Implementation Details**: `docs/IMPLEMENTATION_SUMMARY.md`
-
----
-
-**Version**: 2.0.0  
-**Status**: Production Ready ✅
+**Note**: This tool is not affiliated with Cambridge Assessment or PapaCambridge. Use responsibly and in accordance with their terms of service.

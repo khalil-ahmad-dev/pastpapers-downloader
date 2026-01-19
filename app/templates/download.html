@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Download Progress - Past Papers Downloader</title>
+    <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/images/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/images/favicon-16x16.png">
+    <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico">
     <style>
         * {
             margin: 0;
@@ -246,12 +250,23 @@
             
             try {
                 const response = await fetch(`/api/v1/downloads/${jobId}/progress`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
                 const data = await response.json();
+                
+                // Validate data structure
+                if (!data || typeof data !== 'object') {
+                    throw new Error('Invalid response data');
+                }
                 
                 renderProgress(data);
                 
                 // If not completed, continue polling
-                if (data.status !== 'completed' && data.status !== 'failed') {
+                const status = data.status || 'unknown';
+                if (status !== 'completed' && status !== 'failed') {
                     if (!pollInterval) {
                         pollInterval = setInterval(loadProgress, 2000); // Poll every 2 seconds
                     }
@@ -270,33 +285,43 @@
             const container = document.getElementById('progress-container');
             const downloadButton = document.getElementById('download-button');
             
-            const statusClass = data.status.toLowerCase().replace('_', '-');
-            const statusText = data.status.replace('_', ' ').toUpperCase();
+            // Safely handle missing or undefined status
+            const status = data.status || 'unknown';
+            const statusClass = status.toLowerCase().replace('_', '-');
+            const statusText = status.replace('_', ' ').toUpperCase();
+            
+            // Provide default values for missing fields
+            const percentage = data.percentage || 0;
+            const currentFile = data.current_file || 0;
+            const totalFiles = data.total_files || 0;
+            const message = data.message || 'Loading...';
+            const downloadedFiles = data.downloaded_files || [];
+            const failedFiles = data.failed_files || [];
             
             let html = `
                 <div class="status-card">
                     <div class="status-badge ${statusClass}">${statusText}</div>
                     
                     <div class="progress-bar-container">
-                        <div class="progress-bar" style="width: ${data.percentage}%">
-                            ${Math.round(data.percentage)}%
+                        <div class="progress-bar" style="width: ${percentage}%">
+                            ${Math.round(percentage)}%
                         </div>
                     </div>
                     
                     <div class="progress-info">
-                        <span>File ${data.current_file} of ${data.total_files}</span>
-                        <span>${Math.round(data.percentage)}%</span>
+                        <span>File ${currentFile} of ${totalFiles}</span>
+                        <span>${Math.round(percentage)}%</span>
                     </div>
                     
-                    <div class="message">${data.message}</div>
+                    <div class="message">${message}</div>
                     
                     <div class="stats">
                         <div class="stat-card">
-                            <div class="value">${data.downloaded_files.length}</div>
+                            <div class="value">${downloadedFiles.length}</div>
                             <div class="label">Downloaded</div>
                         </div>
                         <div class="stat-card">
-                            <div class="value">${data.failed_files.length}</div>
+                            <div class="value">${failedFiles.length}</div>
                             <div class="label">Failed</div>
                         </div>
                     </div>
