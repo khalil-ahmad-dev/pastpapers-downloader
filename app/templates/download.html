@@ -252,6 +252,16 @@
                 const response = await fetch(`/api/v1/downloads/${jobId}/progress`);
                 
                 if (!response.ok) {
+                    // If 404, job might not exist yet (serverless issue) or job_id is wrong
+                    if (response.status === 404) {
+                        // Try to get more details from error response
+                        try {
+                            const errorData = await response.json();
+                            throw new Error(`Job not found: ${errorData.detail || 'Job may have expired or not been created yet'}`);
+                        } catch (e) {
+                            throw new Error(`Job not found. This might be a serverless issue - jobs don't persist across requests. Please start a new download.`);
+                        }
+                    }
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
                 

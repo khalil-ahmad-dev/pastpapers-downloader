@@ -9,13 +9,28 @@ import zipfile
 import shutil
 from datetime import datetime
 import uuid
+import json
+import os
 
 from app.services import web_scraper, subject_service, season_service
 from app.core.config import settings
 
 
 # In-memory job storage (in production, use Redis or database)
+# For Vercel/serverless: Also use file-based storage in /tmp
 download_jobs: Dict[str, Dict] = {}
+
+# File-based storage path for serverless environments
+if os.getenv("VERCEL"):
+    JOB_STORAGE_DIR = Path("/tmp") / "pastpapers_jobs"
+else:
+    JOB_STORAGE_DIR = Path(settings.TEMP_DOWNLOAD_DIR) / "jobs"
+
+# Create storage directory
+try:
+    JOB_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+except (PermissionError, OSError):
+    pass
 
 
 async def download_file_async(session: aiohttp.ClientSession, url: str, filepath: Path, semaphore: asyncio.Semaphore):
@@ -75,12 +90,20 @@ async def download_bulk_files(
     Returns:
         Dictionary with download results
     """
-    job = download_jobs[job_id]
+    # Get job (from memory or file)
+    job = get_job_status(job_id)
+    if not job:
+        raise ValueError(f"Job {job_id} not found")
+    
+    # Update job status
     job["status"] = "collecting_files"
     job["started_at"] = datetime.now().isoformat()
     job["message"] = "Collecting file URLs from website..."
     job["current_file"] = 0
     job["total_files"] = 0
+    
+    # Save to file system (for serverless)
+    _save_job_to_file(job_id, job)
     
     # Parse seasons into structured format
     season_map = {}  # {subjectCode: [seasonIds]}
@@ -138,10 +161,12 @@ async def download_bulk_files(
     if total_files == 0:
         job["status"] = "failed"
         job["message"] = "No files found to download."
+        _save_job_to_file(job_id, job)
         return job
     
     job["status"] = "downloading"
     job["message"] = f"Downloading {total_files} files..."
+    _save_job_to_file(job_id, job)
     
     # Download files with concurrency limit
     semaphore = asyncio.Semaphore(settings.MAX_CONCURRENT_DOWNLOADS)
@@ -188,11 +213,16 @@ async def download_bulk_files(
             # Update percentage
             if total_files > 0:
                 job["percentage"] = (downloaded_count / total_files) * 100
+            
+            # Save job to file system periodically (every 10 files or on status change)
+            if downloaded_count % 10 == 0 or downloaded_count == total_files:
+                _save_job_to_file(job_id, job)
     
     # Create ZIP archive
     job["status"] = "creating_zip"
     job["message"] = "Creating ZIP archive..."
     job["percentage"] = 95
+    _save_job_to_file(job_id, job)
     
     zip_path = create_zip_archive(job_id, subjects, qualification)
     
@@ -202,6 +232,9 @@ async def download_bulk_files(
     job["zip_filename"] = zip_path.name
     job["percentage"] = 100
     job["message"] = f"Download complete! {downloaded_count} files downloaded, {failed_count} failed."
+    
+    # Save final job state
+    _save_job_to_file(job_id, job)
     
     return job
 
@@ -240,6 +273,7 @@ def create_download_job(
 ) -> str:
     """
     Create a new download job (without starting it).
+    Stores in both memory and file system for serverless compatibility.
     
     Args:
         qualification: Qualification ID
@@ -252,7 +286,7 @@ def create_download_job(
     """
     job_id = str(uuid.uuid4())
     
-    download_jobs[job_id] = {
+    job_data = {
         "job_id": job_id,
         "qualification": qualification,
         "subjects": subjects,
@@ -272,20 +306,49 @@ def create_download_job(
         "direct_download_urls": [],  # For direct downloads
     }
     
+    # Store in memory (for local dev)
+    download_jobs[job_id] = job_data
+    
+    # Also store in file system (for Vercel/serverless)
+    try:
+        job_file = JOB_STORAGE_DIR / f"{job_id}.json"
+        with open(job_file, 'w') as f:
+            json.dump(job_data, f)
+    except (PermissionError, OSError) as e:
+        # If file storage fails, continue with memory only
+        pass
+    
     return job_id
 
 
 def get_job_status(job_id: str) -> Optional[Dict]:
     """
     Get the status of a download job.
+    Checks both memory and file system for serverless compatibility.
     
     Args:
         job_id: Job ID
     
     Returns:
-        Job status dictionary or None if not found
+        Job dictionary or None if not found.
     """
-    return download_jobs.get(job_id)
+    # First check memory (fast, for local dev)
+    if job_id in download_jobs:
+        return download_jobs[job_id]
+    
+    # Then check file system (for Vercel/serverless)
+    try:
+        job_file = JOB_STORAGE_DIR / f"{job_id}.json"
+        if job_file.exists():
+            with open(job_file, 'r') as f:
+                job_data = json.load(f)
+                # Also load into memory for faster subsequent access
+                download_jobs[job_id] = job_data
+                return job_data
+    except (PermissionError, OSError, json.JSONDecodeError):
+        pass
+    
+    return None
 
 
 def cleanup_job(job_id: str):
@@ -373,6 +436,8 @@ async def download_direct_files(
     job["status"] = "ready"
     job["message"] = f"Ready to download {total_files} files. Click 'Start Download' to begin."
     job["direct_download_urls"] = all_files
+    
+    _save_job_to_file(job_id, job)
     
     return job
 
