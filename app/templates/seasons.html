@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Select Seasons - Past Papers Downloader</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+        
+        .header {
+            max-width: 1200px;
+            margin: 0 auto 30px;
+        }
+        
+        .back-button {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #4a90e2;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            transition: background 0.2s;
+        }
+        
+        .back-button:hover {
+            background: #357abd;
+        }
+        
+        h1 {
+            color: #333;
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 1em;
+            margin-bottom: 15px;
+        }
+        
+        .selected-subjects {
+            background: #e8f4f8;
+            padding: 12px 15px;
+            border-left: 3px solid #4a90e2;
+            margin-bottom: 20px;
+        }
+        
+        .selected-subjects strong {
+            color: #4a90e2;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .select-all-section {
+            background: white;
+            padding: 15px 20px;
+            border: 1px solid #e0e0e0;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .select-all-checkbox {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        
+        .select-all-label {
+            font-weight: 600;
+            color: #333;
+            cursor: pointer;
+        }
+        
+        .year-group {
+            background: white;
+            border: 1px solid #e0e0e0;
+            margin-bottom: 20px;
+        }
+        
+        .year-header {
+            background: #f8f8f8;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e0e0e0;
+            font-weight: 600;
+            font-size: 1.1em;
+            color: #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .select-all-year {
+            padding: 6px 12px;
+            background: #4a90e2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background 0.2s;
+        }
+        
+        .select-all-year:hover:not(:disabled) {
+            background: #357abd;
+        }
+        
+        .select-all-year:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .seasons-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1px;
+            background: #e0e0e0;
+            padding: 1px;
+        }
+        
+        .season-item {
+            background: white;
+            padding: 15px;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .season-item:hover {
+            background: #f5f5f5;
+        }
+        
+        .season-item.selected {
+            background: #e8f4f8;
+        }
+        
+        .season-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        
+        .season-item-content {
+            flex: 1;
+        }
+        
+        .season-item h3 {
+            color: #333;
+            font-size: 0.95em;
+            margin-bottom: 4px;
+        }
+        
+        .season-item .file-count {
+            color: #666;
+            font-size: 0.85em;
+        }
+        
+        .actions {
+            background: white;
+            border: 1px solid #e0e0e0;
+            padding: 20px;
+            margin-top: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .selected-info {
+            color: #666;
+        }
+        
+        .selected-info strong {
+            color: #4a90e2;
+        }
+        
+        .download-button {
+            padding: 12px 30px;
+            background: #4a90e2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .download-button:hover:not(:disabled) {
+            background: #357abd;
+        }
+        
+        .download-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+        
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-left: 3px solid #c33;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="/subjects?qualification=" id="back-link" class="back-button">← Back to Subjects</a>
+        
+        <h1>Select Seasons (Years)</h1>
+        <p class="subtitle" id="subject-info">Loading...</p>
+        <div class="selected-subjects" id="selected-subjects-info"></div>
+    </div>
+    
+    <div class="container">
+        <div id="seasons-container">
+            <div class="loading">Loading seasons...</div>
+        </div>
+        
+        <div class="download-options" id="download-options" style="background: white; border: 1px solid #e0e0e0; padding: 20px; margin-bottom: 20px;">
+            <h3 style="margin-bottom: 15px; color: #333; font-size: 1.1em;">Download Method</h3>
+            <p style="margin-top: 10px; color: #666; font-size: 0.9em;">
+                Files will be downloaded as a ZIP file. You can choose where to save it.
+            </p>
+        </div>
+        
+        <div class="actions">
+            <div class="selected-info">
+                <strong id="selected-count">0</strong> season(s) selected | 
+                <strong id="total-files">0</strong> files total
+            </div>
+            <button class="download-button" id="download-button" disabled onclick="startDownload()">
+                <span id="download-text">Download Selected</span>
+                <span id="download-spinner" style="display: none;" class="loading-spinner"></span>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const qualificationId = urlParams.get('qualification');
+        const subjectsParam = urlParams.get('subjects');
+        const selectedSubjectCodes = subjectsParam ? subjectsParam.split(',') : [];
+        
+        let allSeasons = {}; // {subjectCode: [seasons]}
+        let selectedSeasons = new Set(); // Store as "subjectCode:seasonId"
+        let subjectNames = {};
+        let isDownloading = false;
+        
+        async function loadSeasons() {
+            const container = document.getElementById('seasons-container');
+            const subjectInfo = document.getElementById('subject-info');
+            const backLink = document.getElementById('back-link');
+            
+            if (!qualificationId || selectedSubjectCodes.length === 0) {
+                container.innerHTML = '<div class="error">No subjects selected. Please go back and select subjects.</div>';
+                return;
+            }
+            
+            backLink.href = `/subjects?qualification=${qualificationId}`;
+            
+            try {
+                const seasonPromises = selectedSubjectCodes.map(async (code) => {
+                    const response = await fetch(`/api/v1/subjects/${code}/seasons?qualification=${qualificationId}`);
+                    const data = await response.json();
+                    
+                    const subjectResponse = await fetch(`/api/v1/subjects/?qualification=${qualificationId}&search=${code}`);
+                    const subjectData = await subjectResponse.json();
+                    const subject = subjectData.subjects.find(s => s.code === code);
+                    if (subject) {
+                        subjectNames[code] = subject.name;
+                    }
+                    
+                    return { code, seasons: data.seasons };
+                });
+                
+                const results = await Promise.all(seasonPromises);
+                
+                results.forEach(({ code, seasons }) => {
+                    allSeasons[code] = seasons;
+                });
+                
+                const subjectNamesList = selectedSubjectCodes.map(code => subjectNames[code] || code).join(', ');
+                subjectInfo.textContent = `${selectedSubjectCodes.length} subject(s) selected: ${subjectNamesList}`;
+                
+                document.getElementById('selected-subjects-info').innerHTML = 
+                    `<strong>Selected Subjects:</strong> ${subjectNamesList}`;
+                
+                renderSeasons();
+            } catch (error) {
+                container.innerHTML = `<div class="error">Error loading seasons: ${error.message}</div>`;
+            }
+        }
+        
+        function renderSeasons() {
+            const container = document.getElementById('seasons-container');
+            container.innerHTML = '';
+            
+            // Add "Select All" section
+            const selectAllSection = document.createElement('div');
+            selectAllSection.className = 'select-all-section';
+            const selectAllCheckbox = document.createElement('input');
+            selectAllCheckbox.type = 'checkbox';
+            selectAllCheckbox.className = 'select-all-checkbox';
+            selectAllCheckbox.id = 'select-all-checkbox';
+            selectAllCheckbox.onchange = () => {
+                if (selectAllCheckbox.checked) {
+                    selectAllSeasons();
+                } else {
+                    deselectAllSeasons();
+                }
+            };
+            const selectAllLabel = document.createElement('label');
+            selectAllLabel.className = 'select-all-label';
+            selectAllLabel.htmlFor = 'select-all-checkbox';
+            selectAllLabel.textContent = 'Select All Seasons';
+            selectAllSection.appendChild(selectAllCheckbox);
+            selectAllSection.appendChild(selectAllLabel);
+            container.appendChild(selectAllSection);
+            
+            // Group seasons by year
+            const seasonsByYear = {};
+            
+            Object.keys(allSeasons).forEach(subjectCode => {
+                allSeasons[subjectCode].forEach(season => {
+                    const year = season.year;
+                    if (!seasonsByYear[year]) {
+                        seasonsByYear[year] = [];
+                    }
+                    seasonsByYear[year].push({ ...season, subjectCode });
+                });
+            });
+            
+            const sortedYears = Object.keys(seasonsByYear).sort((a, b) => parseInt(b) - parseInt(a));
+            
+            sortedYears.forEach(year => {
+                const yearGroup = document.createElement('div');
+                yearGroup.className = 'year-group';
+                
+                const yearHeader = document.createElement('div');
+                yearHeader.className = 'year-header';
+                yearHeader.innerHTML = `
+                    <span>Year ${year}</span>
+                    <button class="select-all-year" onclick="selectAllInYear('${year}')">Select All</button>
+                `;
+                
+                const seasonsGrid = document.createElement('div');
+                seasonsGrid.className = 'seasons-grid';
+                
+                seasonsByYear[year].forEach(season => {
+                    const item = createSeasonItem(season);
+                    seasonsGrid.appendChild(item);
+                });
+                
+                yearGroup.appendChild(yearHeader);
+                yearGroup.appendChild(seasonsGrid);
+                container.appendChild(yearGroup);
+            });
+            
+            updateSelectedInfo();
+        }
+        
+        function createSeasonItem(season) {
+            const item = document.createElement('div');
+            const key = `${season.subjectCode}:${season.id}`;
+            item.className = 'season-item';
+            item.dataset.key = key;
+            
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = selectedSeasons.has(key);
+            checkbox.onchange = () => toggleSeason(key, checkbox.checked);
+            
+            const content = document.createElement('div');
+            content.className = 'season-item-content';
+            content.innerHTML = `
+                <h3>${season.name}</h3>
+                <div class="file-count">${season.file_count} files</div>
+            `;
+            
+            item.appendChild(checkbox);
+            item.appendChild(content);
+            item.onclick = (e) => {
+                if (e.target !== checkbox && e.target.tagName !== 'H3' && e.target.tagName !== 'DIV') {
+                    checkbox.checked = !checkbox.checked;
+                    toggleSeason(key, checkbox.checked);
+                }
+            };
+            
+            if (selectedSeasons.has(key)) {
+                item.classList.add('selected');
+            }
+            
+            return item;
+        }
+        
+        function toggleSeason(key, isSelected) {
+            if (isSelected) {
+                selectedSeasons.add(key);
+            } else {
+                selectedSeasons.delete(key);
+            }
+            
+            updateSelectedInfo();
+            updateItemStates();
+            updateDownloadButton();
+            updateSelectAllCheckbox();
+        }
+        
+        function selectAllSeasons() {
+            Object.keys(allSeasons).forEach(subjectCode => {
+                allSeasons[subjectCode].forEach(season => {
+                    const key = `${subjectCode}:${season.id}`;
+                    selectedSeasons.add(key);
+                });
+            });
+            
+            updateSelectedInfo();
+            updateItemStates();
+            updateDownloadButton();
+            updateSelectAllCheckbox();
+        }
+        
+        function deselectAllSeasons() {
+            selectedSeasons.clear();
+            updateSelectedInfo();
+            updateItemStates();
+            updateDownloadButton();
+            updateSelectAllCheckbox();
+        }
+        
+        function selectAllInYear(year) {
+            Object.keys(allSeasons).forEach(subjectCode => {
+                allSeasons[subjectCode].forEach(season => {
+                    if (season.year === parseInt(year)) {
+                        const key = `${subjectCode}:${season.id}`;
+                        selectedSeasons.add(key);
+                    }
+                });
+            });
+            
+            updateSelectedInfo();
+            updateItemStates();
+            updateDownloadButton();
+            updateSelectAllCheckbox();
+        }
+        
+        function updateSelectedInfo() {
+            const count = selectedSeasons.size;
+            document.getElementById('selected-count').textContent = count;
+            
+            let totalFiles = 0;
+            selectedSeasons.forEach(key => {
+                const [subjectCode, seasonId] = key.split(':');
+                const season = allSeasons[subjectCode]?.find(s => s.id === seasonId);
+                if (season) {
+                    totalFiles += season.file_count;
+                }
+            });
+            
+            document.getElementById('total-files').textContent = totalFiles;
+        }
+        
+        function updateItemStates() {
+            document.querySelectorAll('.season-item').forEach(item => {
+                const key = item.dataset.key;
+                const checkbox = item.querySelector('input[type="checkbox"]');
+                
+                if (selectedSeasons.has(key)) {
+                    item.classList.add('selected');
+                    checkbox.checked = true;
+                } else {
+                    item.classList.remove('selected');
+                    checkbox.checked = false;
+                }
+            });
+        }
+        
+        function updateSelectAllCheckbox() {
+            const selectAllCheckbox = document.getElementById('select-all-checkbox');
+            if (selectAllCheckbox) {
+                const totalSeasons = Object.values(allSeasons).reduce((sum, seasons) => sum + seasons.length, 0);
+                selectAllCheckbox.checked = selectedSeasons.size === totalSeasons && totalSeasons > 0;
+            }
+        }
+        
+        function updateDownloadButton() {
+            const downloadButton = document.getElementById('download-button');
+            downloadButton.disabled = selectedSeasons.size === 0 || isDownloading;
+        }
+        
+        async function startDownload() {
+            if (selectedSeasons.size === 0 || isDownloading) {
+                return;
+            }
+            
+            // Set loading state
+            isDownloading = true;
+            const downloadButton = document.getElementById('download-button');
+            const downloadText = document.getElementById('download-text');
+            const downloadSpinner = document.getElementById('download-spinner');
+            
+            downloadButton.disabled = true;
+            downloadText.textContent = 'Starting Download...';
+            downloadSpinner.style.display = 'inline-block';
+            
+            // Disable all checkboxes and buttons
+            document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.disabled = true);
+            document.querySelectorAll('.select-all-year').forEach(btn => btn.disabled = true);
+            document.getElementById('select-all-checkbox').disabled = true;
+            
+            // Store navigation info for back button
+            sessionStorage.setItem('qualificationId', qualificationId);
+            sessionStorage.setItem('selectedSubjects', selectedSubjectCodes.join(','));
+            
+            const downloadData = {
+                qualification: qualificationId,
+                subjects: selectedSubjectCodes,
+                seasons: Array.from(selectedSeasons),
+                download_method: 'zip', // Always ZIP
+            };
+            
+            // Send request and redirect IMMEDIATELY - don't wait for response
+            downloadText.textContent = 'Redirecting...';
+            
+            // Fire and forget - redirect immediately
+            fetch('/api/v1/downloads/bulk', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(downloadData),
+            })
+            .then(response => response.json())
+            .then(result => {
+                // Store job ID if we got it
+                if (result.job_id) {
+                    sessionStorage.setItem('downloadJobId', result.job_id);
+                }
+            })
+            .catch(error => {
+                // Ignore errors - we're redirecting anyway
+                console.error('Error starting download:', error);
+            });
+            
+            // Redirect IMMEDIATELY - progress page will poll for job
+            setTimeout(() => {
+                window.location.href = `/download`;
+            }, 100); // Small delay to ensure request is sent
+        }
+        
+        function resetDownloadState() {
+            isDownloading = false;
+            const downloadButton = document.getElementById('download-button');
+            const downloadText = document.getElementById('download-text');
+            const downloadSpinner = document.getElementById('download-spinner');
+            
+            downloadButton.disabled = selectedSeasons.size === 0;
+            downloadText.textContent = 'Download Selected';
+            downloadSpinner.style.display = 'none';
+            
+            document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.disabled = false);
+            document.querySelectorAll('.select-all-year').forEach(btn => btn.disabled = false);
+            document.getElementById('select-all-checkbox').disabled = false;
+            document.querySelectorAll('input[name="download-method"]').forEach(radio => radio.disabled = false);
+        }
+        
+        loadSeasons();
+    </script>
+</body>
+</html>

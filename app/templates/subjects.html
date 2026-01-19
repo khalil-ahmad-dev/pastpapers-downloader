@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Select Subjects - Past Papers Downloader</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+        
+        .header {
+            max-width: 1200px;
+            margin: 0 auto 30px;
+        }
+        
+        .back-button {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #4a90e2;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            transition: background 0.2s;
+        }
+        
+        .back-button:hover {
+            background: #357abd;
+        }
+        
+        h1 {
+            color: #333;
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 1em;
+            margin-bottom: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .search-box {
+            background: white;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            margin-bottom: 20px;
+        }
+        
+        .search-box input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            font-size: 1em;
+        }
+        
+        .search-box input:focus {
+            outline: none;
+            border-color: #4a90e2;
+        }
+        
+        .subjects-container {
+            background: white;
+            border: 1px solid #e0e0e0;
+            margin-bottom: 20px;
+        }
+        
+        .subjects-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1px;
+            background: #e0e0e0;
+            padding: 1px;
+        }
+        
+        .subject-item {
+            background: white;
+            padding: 15px;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .subject-item:hover {
+            background: #f5f5f5;
+        }
+        
+        .subject-item.selected {
+            background: #e8f4f8;
+        }
+        
+        .subject-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        
+        .subject-item-content {
+            flex: 1;
+        }
+        
+        .subject-item h3 {
+            color: #333;
+            font-size: 0.95em;
+            margin-bottom: 4px;
+        }
+        
+        .subject-item .code {
+            color: #666;
+            font-size: 0.85em;
+        }
+        
+        .actions {
+            background: white;
+            border: 1px solid #e0e0e0;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .selected-count {
+            color: #666;
+        }
+        
+        .selected-count strong {
+            color: #4a90e2;
+        }
+        
+        .next-button {
+            padding: 12px 30px;
+            background: #4a90e2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .next-button:hover:not(:disabled) {
+            background: #357abd;
+        }
+        
+        .next-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+        
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-left: 3px solid #c33;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="/" class="back-button">← Back to Qualifications</a>
+        
+        <h1>Select Subjects</h1>
+        <p class="subtitle" id="qualification-name">Loading...</p>
+    </div>
+    
+    <div class="container">
+        <div class="search-box">
+            <input type="text" id="search-input" placeholder="Search subjects...">
+        </div>
+        
+        <div class="subjects-container">
+            <div id="subjects-container">
+                <div class="loading">Loading subjects...</div>
+            </div>
+        </div>
+        
+        <div class="actions">
+            <div class="selected-count">
+                <strong id="selected-count">0</strong> subject(s) selected
+            </div>
+            <button class="next-button" id="next-button" disabled onclick="proceedToSeasons()">
+                Next: Select Seasons →
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const qualificationId = urlParams.get('qualification');
+        let allSubjects = [];
+        let selectedSubjects = new Set();
+        
+        async function loadSubjects() {
+            const container = document.getElementById('subjects-container');
+            const qualificationName = document.getElementById('qualification-name');
+            
+            if (!qualificationId) {
+                container.innerHTML = '<div class="error">No qualification selected. Please go back and select a qualification.</div>';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/v1/subjects/?qualification=${qualificationId}`);
+                const data = await response.json();
+                
+                if (data.subjects && data.subjects.length > 0) {
+                    allSubjects = data.subjects;
+                    qualificationName.textContent = `${data.qualification} - ${data.total} subjects available`;
+                    renderSubjects(data.subjects);
+                } else {
+                    container.innerHTML = '<div class="error">No subjects found</div>';
+                }
+            } catch (error) {
+                container.innerHTML = `<div class="error">Error loading subjects: ${error.message}</div>`;
+            }
+        }
+        
+        function renderSubjects(subjects) {
+            const container = document.getElementById('subjects-container');
+            container.innerHTML = '<div class="subjects-grid"></div>';
+            const grid = container.querySelector('.subjects-grid');
+            
+            subjects.forEach(subject => {
+                const item = document.createElement('div');
+                item.className = 'subject-item';
+                item.dataset.code = subject.code;
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.checked = selectedSubjects.has(subject.code);
+                checkbox.onchange = () => toggleSubject(subject.code, checkbox.checked);
+                
+                const content = document.createElement('div');
+                content.className = 'subject-item-content';
+                content.innerHTML = `
+                    <h3>${subject.name}</h3>
+                    <div class="code">Code: ${subject.code}</div>
+                `;
+                
+                item.appendChild(checkbox);
+                item.appendChild(content);
+                item.onclick = (e) => {
+                    if (e.target !== checkbox && e.target.tagName !== 'H3' && e.target.tagName !== 'DIV') {
+                        checkbox.checked = !checkbox.checked;
+                        toggleSubject(subject.code, checkbox.checked);
+                    }
+                };
+                
+                if (selectedSubjects.has(subject.code)) {
+                    item.classList.add('selected');
+                }
+                
+                grid.appendChild(item);
+            });
+        }
+        
+        function toggleSubject(code, isSelected) {
+            if (isSelected) {
+                selectedSubjects.add(code);
+            } else {
+                selectedSubjects.delete(code);
+            }
+            
+            updateSelectedCount();
+            updateItemStates();
+            updateNextButton();
+        }
+        
+        function updateSelectedCount() {
+            document.getElementById('selected-count').textContent = selectedSubjects.size;
+        }
+        
+        function updateItemStates() {
+            document.querySelectorAll('.subject-item').forEach(item => {
+                const code = item.dataset.code;
+                if (selectedSubjects.has(code)) {
+                    item.classList.add('selected');
+                    item.querySelector('input[type="checkbox"]').checked = true;
+                } else {
+                    item.classList.remove('selected');
+                    item.querySelector('input[type="checkbox"]').checked = false;
+                }
+            });
+        }
+        
+        function updateNextButton() {
+            const nextButton = document.getElementById('next-button');
+            nextButton.disabled = selectedSubjects.size === 0;
+        }
+        
+        function proceedToSeasons() {
+            if (selectedSubjects.size === 0) {
+                alert('Please select at least one subject');
+                return;
+            }
+            
+            window.location.href = `/seasons?qualification=${qualificationId}&subjects=${Array.from(selectedSubjects).join(',')}`;
+        }
+        
+        document.getElementById('search-input').addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            const filtered = allSubjects.filter(subj => 
+                subj.name.toLowerCase().includes(searchTerm) ||
+                subj.code.toLowerCase().includes(searchTerm)
+            );
+            renderSubjects(filtered);
+            updateItemStates();
+        });
+        
+        loadSubjects();
+    </script>
+</body>
+</html>
