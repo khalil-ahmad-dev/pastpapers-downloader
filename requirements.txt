@@ -20,6 +20,9 @@ websockets==12.0
 # Optional: Authentication (for future)
 # python-jose[cryptography]==3.3.0
 
+# Redis for Vercel/serverless (optional - falls back to file storage)
+upstash-redis==1.0.0
+
 # Development (Optional)
 # pytest==7.4.4
 # black==24.1.1

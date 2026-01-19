@@ -61,8 +61,18 @@ async def start_bulk_download(
         # Set initial status and save immediately
         job["status"] = "initializing"
         job["message"] = "Starting download... Please wait."
+        
         # Save job to file immediately (critical for serverless)
         download_service.save_job_to_file(job_id, job)
+        
+        # CRITICAL: Verify file was written (for Vercel)
+        # Re-read from file to ensure it's persisted
+        job_verify = download_service.get_job_status(job_id)
+        if not job_verify:
+            # If we can't read it back, there's a storage issue
+            # But don't fail - let background task handle it
+            import logging
+            logging.error(f"Job {job_id} not found after save - storage issue")
         
         # Start download in background (this does all the heavy work)
         background_tasks.add_task(
@@ -101,9 +111,35 @@ async def get_download_progress(job_id: str):
     job = download_service.get_job_status(job_id)
     
     if not job:
+        # Try to get more info about why job wasn't found
+        import os
+        from pathlib import Path
+        
+        # Check storage info
+        try:
+            from app.services.download_service import JOB_STORAGE_DIR
+            storage_exists = JOB_STORAGE_DIR.exists() if JOB_STORAGE_DIR else False
+            storage_path = str(JOB_STORAGE_DIR) if JOB_STORAGE_DIR else "unknown"
+        except:
+            storage_exists = False
+            storage_path = "unknown"
+        
+        vercel_env = os.getenv("VERCEL", "not set")
+        vercel_env_alt = os.getenv("VERCEL_ENV", "not set")
+        
+        # In serverless (Vercel), jobs might not persist due to isolated /tmp
+        # Return a helpful error message
+        error_detail = (
+            f"Job '{job_id}' not found. "
+            f"This is likely due to Vercel serverless limitations - "
+            f"each function invocation has an isolated /tmp directory, "
+            f"so files written in one request aren't visible in another. "
+            f"Please start a new download."
+        )
+        
         raise HTTPException(
             status_code=404,
-            detail=f"Job '{job_id}' not found",
+            detail=error_detail,
         )
     
     # Build progress response

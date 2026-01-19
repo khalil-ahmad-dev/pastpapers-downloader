@@ -17,16 +17,46 @@ from app.core.config import settings
 
 
 # In-memory job storage (in production, use Redis or database)
-# For Vercel/serverless: Also use file-based storage in /tmp
+# For Vercel/serverless: Use Redis if available, fallback to file storage
 download_jobs: Dict[str, Dict] = {}
 
-# File-based storage path for serverless environments
-if os.getenv("VERCEL"):
+# Redis client (optional - for Vercel/serverless)
+_redis_client = None
+_redis_enabled = False
+
+# Try to initialize Redis (for Vercel/serverless)
+try:
+    from upstash_redis import Redis
+    
+    # Check for Redis environment variables
+    redis_url = os.getenv("UPSTASH_REDIS_REST_URL") or os.getenv("REDIS_URL")
+    redis_token = os.getenv("UPSTASH_REDIS_REST_TOKEN") or os.getenv("REDIS_TOKEN")
+    
+    if redis_url and redis_token:
+        _redis_client = Redis(url=redis_url, token=redis_token)
+        _redis_enabled = True
+        # Test connection
+        try:
+            _redis_client.ping()
+        except Exception:
+            _redis_client = None
+            _redis_enabled = False
+except ImportError:
+    # Redis not installed - use file storage
+    pass
+except Exception:
+    # Redis connection failed - fallback to file storage
+    pass
+
+# File-based storage path (fallback for local dev or if Redis unavailable)
+# Vercel sets VERCEL=1, but also check for other indicators
+is_vercel = os.getenv("VERCEL") or os.getenv("VERCEL_ENV") or os.getenv("NOW_REGION")
+if is_vercel:
     JOB_STORAGE_DIR = Path("/tmp") / "pastpapers_jobs"
 else:
     JOB_STORAGE_DIR = Path(settings.TEMP_DOWNLOAD_DIR) / "jobs"
 
-# Create storage directory
+# Create storage directory (for file-based fallback)
 try:
     JOB_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
 except (PermissionError, OSError):
@@ -306,71 +336,107 @@ def create_download_job(
         "direct_download_urls": [],  # For direct downloads
     }
     
-    # Store in memory (for local dev)
+    # Store in memory (for local dev - fast access)
     download_jobs[job_id] = job_data
     
-    # Also store in file system (for Vercel/serverless)
-    # CRITICAL: Must save to file immediately for serverless
-    try:
-        # Ensure directory exists
-        JOB_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
-        
-        job_file = JOB_STORAGE_DIR / f"{job_id}.json"
-        with open(job_file, 'w') as f:
-            json.dump(job_data, f)
-            f.flush()  # Flush before closing
-            # Sync to disk (important for serverless)
-            import os
-            if hasattr(f, 'fileno'):
-                try:
-                    os.fsync(f.fileno())
-                except OSError:
-                    pass  # Some file systems don't support fsync
-    except (PermissionError, OSError) as e:
-        # If file storage fails, continue with memory only
-        # But log the error for debugging
-        import logging
-        logging.warning(f"Failed to save job to file: {e}")
-        pass
+    # Store in Redis if available (for Vercel/serverless)
+    if _redis_enabled and _redis_client:
+        try:
+            _redis_client.set(
+                f"job:{job_id}",
+                json.dumps(job_data),
+                ex=3600  # Expire after 1 hour
+            )
+        except Exception as e:
+            import logging
+            logging.warning(f"Failed to save job to Redis: {e}, falling back to file storage")
+    
+    # Also store in file system (fallback for local dev or if Redis unavailable)
+    if not _redis_enabled:
+        try:
+            # Ensure directory exists
+            JOB_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+            
+            job_file = JOB_STORAGE_DIR / f"{job_id}.json"
+            with open(job_file, 'w') as f:
+                json.dump(job_data, f)
+                f.flush()  # Flush before closing
+                # Sync to disk (important for serverless)
+                if hasattr(f, 'fileno'):
+                    try:
+                        os.fsync(f.fileno())
+                    except OSError:
+                        pass  # Some file systems don't support fsync
+        except (PermissionError, OSError) as e:
+            # If file storage fails, continue with memory only
+            import logging
+            logging.warning(f"Failed to save job to file: {e}")
+            pass
     
     return job_id
 
 
 def save_job_to_file(job_id: str, job_data: Dict):
     """
-    Save job data to file system (for serverless compatibility).
-    CRITICAL: Must ensure file is written and flushed for Vercel.
+    Save job data to Redis (if available) or file system (fallback).
+    CRITICAL: Must ensure data is persisted for serverless.
     
     Args:
         job_id: Job ID
         job_data: Job data dictionary
     """
+    # Try Redis first (for Vercel/serverless)
+    if _redis_enabled and _redis_client:
+        try:
+            _redis_client.set(
+                f"job:{job_id}",
+                json.dumps(job_data),
+                ex=3600  # Expire after 1 hour
+            )
+            return  # Success - no need for file storage
+        except Exception as e:
+            import logging
+            logging.warning(f"Failed to save job {job_id} to Redis: {e}, falling back to file storage")
+    
+    # Fallback to file storage (for local dev or if Redis unavailable)
     try:
         # Ensure directory exists
         JOB_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
         
         job_file = JOB_STORAGE_DIR / f"{job_id}.json"
-        with open(job_file, 'w') as f:
+        
+        # Write to temporary file first, then rename (atomic operation)
+        temp_file = job_file.with_suffix('.tmp')
+        
+        with open(temp_file, 'w') as f:
             json.dump(job_data, f)
             f.flush()  # Flush before closing
             # Sync to disk (critical for serverless)
-            import os
             if hasattr(f, 'fileno'):
                 try:
                     os.fsync(f.fileno())
                 except OSError:
                     pass  # Some file systems don't support fsync
+        
+        # Atomic rename (ensures file is complete)
+        temp_file.replace(job_file)
+        
+        # Verify file was written
+        if not job_file.exists():
+            raise OSError(f"Job file {job_file} was not created")
+            
     except (PermissionError, OSError) as e:
         # If file storage fails, continue with memory only
         import logging
         logging.warning(f"Failed to save job {job_id} to file: {e}")
+        # Don't raise - allow fallback to memory
         pass
 
 
 def get_job_status(job_id: str) -> Optional[Dict]:
     """
     Get the status of a download job.
-    Checks both memory and file system for serverless compatibility.
+    Checks memory, Redis, and file system (in that order).
     
     Args:
         job_id: Job ID
@@ -382,7 +448,20 @@ def get_job_status(job_id: str) -> Optional[Dict]:
     if job_id in download_jobs:
         return download_jobs[job_id]
     
-    # Then check file system (for Vercel/serverless)
+    # Then check Redis (for Vercel/serverless)
+    if _redis_enabled and _redis_client:
+        try:
+            job_data_str = _redis_client.get(f"job:{job_id}")
+            if job_data_str:
+                job_data = json.loads(job_data_str)
+                # Also load into memory for faster subsequent access
+                download_jobs[job_id] = job_data
+                return job_data
+        except Exception as e:
+            import logging
+            logging.warning(f"Error reading job from Redis {job_id}: {e}, falling back to file storage")
+    
+    # Finally check file system (fallback for local dev or if Redis unavailable)
     try:
         job_file = JOB_STORAGE_DIR / f"{job_id}.json"
         if job_file.exists():
@@ -391,7 +470,14 @@ def get_job_status(job_id: str) -> Optional[Dict]:
                 # Also load into memory for faster subsequent access
                 download_jobs[job_id] = job_data
                 return job_data
-    except (PermissionError, OSError, json.JSONDecodeError):
+        else:
+            # File doesn't exist - log for debugging
+            import logging
+            logging.debug(f"Job file not found: {job_file} (dir exists: {JOB_STORAGE_DIR.exists()})")
+    except (PermissionError, OSError, json.JSONDecodeError) as e:
+        # Log error for debugging
+        import logging
+        logging.warning(f"Error reading job file {job_id}: {e}")
         pass
     
     return None
