@@ -21,12 +21,8 @@ class Settings:
     # Directories
     BASE_DIR: Path = Path(__file__).parent.parent.parent
     
-    # Use /tmp for Vercel (serverless) or local temp_downloads for local dev
-    # Vercel only allows writes to /tmp directory
-    if os.getenv("VERCEL"):
-        TEMP_DOWNLOAD_DIR: Path = Path("/tmp") / "pastpapers_downloads"
-    else:
-        TEMP_DOWNLOAD_DIR: Path = BASE_DIR / "temp_downloads"
+    # Local download directory
+    TEMP_DOWNLOAD_DIR: Path = BASE_DIR / "temp_downloads"
     
     OUTPUT_DIR: Path = BASE_DIR / "output"
     
@@ -49,12 +45,10 @@ class Settings:
 # Global settings instance
 settings = Settings()
 
-# Create necessary directories (only if not in Vercel or if /tmp exists)
+# Create necessary directories
 try:
     settings.TEMP_DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
 except (PermissionError, OSError):
-    # In some serverless environments, we can't create directories at startup
-    # They'll be created when needed
     pass
 
 try:

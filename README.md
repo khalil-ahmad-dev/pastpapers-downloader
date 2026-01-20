@@ -92,8 +92,6 @@ PastPapersDownloader/
 │   ├── static/            # Static files (CSS, JS, images)
 │   ├── templates/         # HTML templates
 │   └── main.py            # FastAPI application entry point
-├── api/
-│   └── index.py           # Vercel serverless function entry point
 ├── temp_downloads/        # Temporary download storage (local)
 ├── requirements.txt       # Python dependencies
 └── README.md              # This file
@@ -170,10 +168,6 @@ pytest
 - **API Endpoints**: REST API routes
 - **Models**: Data validation with Pydantic
 - **Templates**: Frontend HTML/CSS/JS
-
-## Deployment
-
-For deployment instructions, see [docs/VERCEL_DEPLOYMENT.md](docs/VERCEL_DEPLOYMENT.md).
 
 ## License
 

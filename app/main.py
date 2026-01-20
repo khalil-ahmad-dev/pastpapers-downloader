@@ -42,15 +42,13 @@ app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(Exception, general_exception_handler)
 
 # Static files and templates
-# Use absolute paths for Vercel compatibility
-import os
 from pathlib import Path
 
 base_path = Path(__file__).parent.parent
 static_dir = base_path / "app" / "static"
 templates_dir = base_path / "app" / "templates"
 
-# Only mount static files if directory exists (for Vercel compatibility)
+# Mount static files
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 

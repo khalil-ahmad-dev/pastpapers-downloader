@@ -16,63 +16,11 @@ from app.services import web_scraper, subject_service, season_service
 from app.core.config import settings
 
 
-# In-memory job storage (in production, use Redis or database)
-# For Vercel/serverless: Use Redis if available, fallback to file storage
+# In-memory job storage
 download_jobs: Dict[str, Dict] = {}
 
-# Redis client (optional - for Vercel/serverless)
-_redis_client = None
-_redis_enabled = False
-
-# Try to initialize Redis (for Vercel/serverless)
-# CRITICAL: Must properly initialize Redis with proper error handling
-try:
-    from upstash_redis import Redis
-    
-    # Check for Redis environment variables (Upstash uses these specific names)
-    redis_url = os.getenv("UPSTASH_REDIS_REST_URL")
-    redis_token = os.getenv("UPSTASH_REDIS_REST_TOKEN")
-    
-    # Also check alternative env var names for compatibility
-    if not redis_url:
-        redis_url = os.getenv("REDIS_URL")
-    if not redis_token:
-        redis_token = os.getenv("REDIS_TOKEN")
-    
-    if redis_url and redis_token:
-        try:
-            _redis_client = Redis(url=redis_url, token=redis_token)
-            # Test connection with a simple operation
-            _redis_client.ping()
-            _redis_enabled = True
-            import logging
-            logging.info("Redis connection established successfully")
-        except Exception as e:
-            import logging
-            logging.warning(f"Redis connection test failed: {e}, will use file storage")
-            _redis_client = None
-            _redis_enabled = False
-    else:
-        import logging
-        logging.debug("Redis environment variables not set, using file storage")
-except ImportError:
-    # Redis not installed - use file storage
-    import logging
-    logging.debug("upstash-redis not installed, using file storage")
-except Exception as e:
-    # Redis connection failed - fallback to file storage
-    import logging
-    logging.warning(f"Redis initialization failed: {e}, will use file storage")
-    _redis_client = None
-    _redis_enabled = False
-
-# File-based storage path (fallback for local dev or if Redis unavailable)
-# Vercel sets VERCEL=1, but also check for other indicators
-is_vercel = os.getenv("VERCEL") or os.getenv("VERCEL_ENV") or os.getenv("NOW_REGION")
-if is_vercel:
-    JOB_STORAGE_DIR = Path("/tmp") / "pastpapers_jobs"
-else:
-    JOB_STORAGE_DIR = Path(settings.TEMP_DOWNLOAD_DIR) / "jobs"
+# File-based storage path for local development
+JOB_STORAGE_DIR = Path(settings.TEMP_DOWNLOAD_DIR) / "jobs"
 
 # Create storage directory (for file-based fallback)
 try:
@@ -354,88 +302,35 @@ def create_download_job(
         "direct_download_urls": [],  # For direct downloads
     }
     
-    # Store in memory (for local dev - fast access)
+    # Store in memory (for fast access)
     download_jobs[job_id] = job_data
     
-    # Store in Redis if available (for Vercel/serverless)
-    # CRITICAL: Always try Redis first if enabled, then fallback
-    redis_saved = False
-    if _redis_enabled and _redis_client:
-        try:
-            _redis_client.set(
-                f"job:{job_id}",
-                json.dumps(job_data),
-                ex=3600  # Expire after 1 hour
-            )
-            # Verify it was saved by reading it back
-            verify = _redis_client.get(f"job:{job_id}")
-            if verify is None:
-                raise Exception("Redis write verification failed")
-            redis_saved = True
-        except Exception as e:
-            import logging
-            logging.error(f"Failed to save job to Redis: {e}, falling back to file storage")
-            redis_saved = False
-    
-    # Also store in file system (fallback for local dev or if Redis unavailable/failed)
-    # On Vercel, if Redis is enabled and working, we skip file storage
-    # On local, always use file storage
-    if not _redis_enabled or not redis_saved:
-        try:
-            # Ensure directory exists
-            JOB_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
-            
-            job_file = JOB_STORAGE_DIR / f"{job_id}.json"
-            with open(job_file, 'w') as f:
-                json.dump(job_data, f)
-                f.flush()  # Flush before closing
-                # Sync to disk (important for serverless)
-                if hasattr(f, 'fileno'):
-                    try:
-                        os.fsync(f.fileno())
-                    except OSError:
-                        pass  # Some file systems don't support fsync
-        except (PermissionError, OSError) as e:
-            # If file storage fails, continue with memory only
-            import logging
-            logging.warning(f"Failed to save job to file: {e}")
-            pass
+    # Store in file system for persistence
+    try:
+        # Ensure directory exists
+        JOB_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+        
+        job_file = JOB_STORAGE_DIR / f"{job_id}.json"
+        with open(job_file, 'w') as f:
+            json.dump(job_data, f)
+            f.flush()  # Flush before closing
+    except (PermissionError, OSError) as e:
+        # If file storage fails, continue with memory only
+        import logging
+        logging.warning(f"Failed to save job to file: {e}")
+        pass
     
     return job_id
 
 
 def save_job_to_file(job_id: str, job_data: Dict):
     """
-    Save job data to Redis (if available) or file system (fallback).
-    CRITICAL: Must ensure data is persisted for serverless.
+    Save job data to file system for persistence.
     
     Args:
         job_id: Job ID
         job_data: Job data dictionary
     """
-    # Try Redis first (for Vercel/serverless)
-    # CRITICAL: Must save to Redis if enabled, verify, then fallback if needed
-    if _redis_enabled and _redis_client:
-        try:
-            job_json = json.dumps(job_data)
-            _redis_client.set(
-                f"job:{job_id}",
-                job_json,
-                ex=3600  # Expire after 1 hour
-            )
-            # Verify it was saved
-            verify = _redis_client.get(f"job:{job_id}")
-            if verify is not None:
-                # Success - Redis is working
-                return
-            else:
-                raise Exception("Redis write verification failed - key not found after write")
-        except Exception as e:
-            import logging
-            logging.error(f"Failed to save job {job_id} to Redis: {e}, falling back to file storage")
-            # Fall through to file storage
-    
-    # Fallback to file storage (for local dev or if Redis unavailable)
     try:
         # Ensure directory exists
         JOB_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
@@ -448,12 +343,6 @@ def save_job_to_file(job_id: str, job_data: Dict):
         with open(temp_file, 'w') as f:
             json.dump(job_data, f)
             f.flush()  # Flush before closing
-            # Sync to disk (critical for serverless)
-            if hasattr(f, 'fileno'):
-                try:
-                    os.fsync(f.fileno())
-                except OSError:
-                    pass  # Some file systems don't support fsync
         
         # Atomic rename (ensures file is complete)
         temp_file.replace(job_file)
@@ -473,7 +362,7 @@ def save_job_to_file(job_id: str, job_data: Dict):
 def get_job_status(job_id: str) -> Optional[Dict]:
     """
     Get the status of a download job.
-    Checks memory, Redis, and file system (in that order).
+    Checks memory first, then file system.
     
     Args:
         job_id: Job ID
@@ -481,35 +370,11 @@ def get_job_status(job_id: str) -> Optional[Dict]:
     Returns:
         Job dictionary or None if not found.
     """
-    # First check memory (fast, for local dev)
+    # First check memory (fast access)
     if job_id in download_jobs:
         return download_jobs[job_id]
     
-    # Then check Redis (for Vercel/serverless)
-    # CRITICAL: Must check Redis if enabled, handle None returns correctly
-    if _redis_enabled and _redis_client:
-        try:
-            job_data_str = _redis_client.get(f"job:{job_id}")
-            # upstash-redis returns None if key doesn't exist, or the value if it does
-            if job_data_str is not None:
-                # Handle both string and bytes responses
-                if isinstance(job_data_str, bytes):
-                    job_data_str = job_data_str.decode('utf-8')
-                elif not isinstance(job_data_str, str):
-                    job_data_str = str(job_data_str)
-                
-                job_data = json.loads(job_data_str)
-                # Also load into memory for faster subsequent access
-                download_jobs[job_id] = job_data
-                return job_data
-        except json.JSONDecodeError as e:
-            import logging
-            logging.error(f"Error parsing job data from Redis {job_id}: {e}")
-        except Exception as e:
-            import logging
-            logging.error(f"Error reading job from Redis {job_id}: {e}, falling back to file storage")
-    
-    # Finally check file system (fallback for local dev or if Redis unavailable)
+    # Then check file system
     try:
         job_file = JOB_STORAGE_DIR / f"{job_id}.json"
         if job_file.exists():
