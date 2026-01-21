@@ -43,7 +43,8 @@ A web application for downloading CAIE (Cambridge Assessment International Educa
 
 3. **Install dependencies**
    ```bash
-   pip install -r requirements.txt
+   python -m pip install --upgrade pip
+pip install -r requirements.txt
    ```
 
 ## Running the Application
@@ -149,6 +150,18 @@ uvicorn app.main:app --port 8001
 - Check internet connection
 - Verify PapaCambridge website is accessible
 - Check server logs for errors
+
+**Windows Installation Errors (lxml, libxml)**
+If you see errors related to `lxml` or `libxml`, make sure you are using the latest version of the code. We have removed the `lxml` dependency to avoid these issues.
+
+**Command 'python3' not found on Windows**
+On Windows, use `python` instead of `python3`.
+
+**Virtual Environment Activation Script Blocked**
+If you get a script execution error on Windows (PowerShell), run:
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
 
 ## Development
 

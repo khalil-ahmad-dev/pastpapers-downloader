@@ -8,7 +8,6 @@ python-dotenv==1.0.0
 # Web Scraping (Existing)
 requests==2.32.5
 beautifulsoup4==4.14.2
-lxml==5.1.0
 
 # Async HTTP for Bulk Downloads
 aiohttp==3.9.1
