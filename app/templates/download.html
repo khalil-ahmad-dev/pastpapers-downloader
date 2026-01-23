@@ -200,6 +200,72 @@
             font-size: 0.9em;
             margin-top: 5px;
         }
+        
+        .failed-files-section {
+            margin-top: 20px;
+            background: #fff5f5;
+            border: 2px solid #fcc;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        
+        .failed-files-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        .failed-files-header h3 {
+            color: #c33;
+            margin: 0;
+            font-size: 1.2em;
+        }
+        
+        .toggle-icon {
+            font-size: 1.5em;
+            color: #c33;
+            transition: transform 0.3s ease;
+        }
+        
+        .toggle-icon.expanded {
+            transform: rotate(180deg);
+        }
+        
+        .failed-files-list {
+            margin-top: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .failed-file-item {
+            background: white;
+            border: 1px solid #fcc;
+            border-radius: 4px;
+            padding: 12px;
+            margin-bottom: 10px;
+        }
+        
+        .failed-file-name {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+            word-break: break-all;
+        }
+        
+        .failed-file-error {
+            color: #c33;
+            font-size: 0.9em;
+            font-family: monospace;
+        }
+        
+        .no-failed-files {
+            color: #666;
+            font-style: italic;
+            text-align: center;
+            padding: 20px;
+        }
     </style>
 </head>
 <body>
@@ -353,8 +419,37 @@
                             <div class="label">Failed</div>
                         </div>
                     </div>
-                </div>
             `;
+            
+            // Add failed files section if there are any failed files
+            if (failedFiles.length > 0) {
+                html += `
+                    <div class="failed-files-section">
+                        <div class="failed-files-header" onclick="toggleFailedFiles()">
+                            <h3>⚠️ Failed Files (${failedFiles.length})</h3>
+                            <span class="toggle-icon" id="toggle-icon">▼</span>
+                        </div>
+                        <div class="failed-files-list" id="failed-files-list" style="display: none;">
+                `;
+                
+                failedFiles.forEach((failedFile, index) => {
+                    const filename = failedFile.filename || 'Unknown file';
+                    const error = failedFile.error || 'Unknown error';
+                    html += `
+                        <div class="failed-file-item">
+                            <div class="failed-file-name">${index + 1}. ${filename}</div>
+                            <div class="failed-file-error">Error: ${error}</div>
+                        </div>
+                    `;
+                });
+                
+                html += `
+                        </div>
+                    </div>
+                `;
+            }
+            
+            html += `</div>`;
             
             container.innerHTML = html;
             
@@ -373,6 +468,21 @@
                     downloadTextElement.textContent = 'Download ZIP File ↓';
                 }
                 downloadButton.onclick = downloadZip;
+            }
+        }
+        
+        function toggleFailedFiles() {
+            const failedFilesList = document.getElementById('failed-files-list');
+            const toggleIcon = document.getElementById('toggle-icon');
+            
+            if (failedFilesList && toggleIcon) {
+                if (failedFilesList.style.display === 'none') {
+                    failedFilesList.style.display = 'block';
+                    toggleIcon.classList.add('expanded');
+                } else {
+                    failedFilesList.style.display = 'none';
+                    toggleIcon.classList.remove('expanded');
+                }
             }
         }
         

@@ -1,6 +1,8 @@
 """
 FastAPI application entry point.
 """
+import logging
+import sys
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -18,6 +20,22 @@ from fastapi import HTTPException
 
 # Import API routers
 from app.api.v1.api import api_router
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG if settings.DEBUG else logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+
+# Set specific log levels for noisy libraries
+logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+logging.getLogger("aiohttp").setLevel(logging.WARNING)
+
+logger = logging.getLogger(__name__)
+logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
 
 app = FastAPI(
     title=settings.APP_NAME,
